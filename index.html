@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Twin: Real-Time Simulation</title>
+    <!-- Import Google Fonts for a tech aesthetic -->
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Import Three.js for 3D rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        :root {
+            --bg-main: #060b14;
+            --bg-panel: #0d1522;
+            --border-color: #1e334a;
+            --accent-cyan: #00e5ff;
+            --accent-green: #00ff66;
+            --text-main: #e2e8f0;
+            --text-dim: #8ba3ba;
+            --font-heading: 'Rajdhani', sans-serif;
+            --font-mono: 'Roboto Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: var(--font-heading);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Header / Top Bar --- */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background: linear-gradient(90deg, rgba(13,21,34,1) 0%, rgba(6,11,20,1) 100%);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 10;
+        }
+
+        .title-block h1 {
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            color: var(--accent-cyan);
+            text-transform: uppercase;
+        }
+
+        .title-block p {
+            font-size: 14px;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+        }
+
+        .api-config {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .api-config input {
+            background: rgba(0, 229, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--accent-cyan);
+            padding: 8px 15px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            width: 300px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .api-config input:focus {
+            border-color: var(--accent-cyan);
+        }
+
+        /* --- Main Layout Grid --- */
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            flex-grow: 1;
+            height: calc(100vh - 70px);
+        }
+
+        /* --- 3D Viewer Area --- */
+        .viewer-section {
+            position: relative;
+            background: radial-gradient(circle at center, #111d2e 0%, var(--bg-main) 100%);
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Floating Annotations inside the 3D viewer */
+        .floating-tag {
+            position: absolute;
+            background: rgba(13, 21, 34, 0.85);
+            border: 1px solid var(--accent-green);
+            color: var(--accent-green);
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.1);
+        }
+        
+        .tag-1 { top: 20%; left: 30%; }
+        .tag-2 { top: 60%; left: 20%; border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .tag-3 { bottom: 25%; right: 35%; border-color: #ff9900; color: #ff9900; }
+
+        /* --- Right Sidebar (Metrics & Chat) --- */
+        .sidebar {
+            background-color: var(--bg-panel);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        /* Metrics Panels */
+        .metric-panel {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .metric-panel h3 {
+            font-size: 14px;
+            color: var(--accent-cyan);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .progress-bar-bg {
+            height: 6px;
+            background: var(--bg-main);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--accent-cyan);
+            width: 85%; /* Mock value */
+        }
+
+        .metric-label {
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        /* --- Chat Interface --- */
+        .chat-panel {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-main);
+            overflow: hidden;
+            min-height: 300px;
+        }
+
+        .chat-header {
+            background: var(--border-color);
+            padding: 10px 15px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            letter-spacing: 1px;
+        }
+
+        #chat-messages {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 10px 12px;
+            border-radius: 4px;
+            line-height: 1.4;
+        }
+
+        .user-message {
+            background: rgba(0, 229, 255, 0.1);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            color: var(--accent-cyan);
+            align-self: flex-end;
+        }
+
+        .ai-message {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            align-self: flex-start;
+        }
+
+        .error-message {
+            color: #ff4444;
+            border-color: #ff4444;
+        }
+
+        .chat-input-area {
+            display: flex;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.02);
+            border-top: 1px solid var(--border-color);
+        }
+
+        #user-input {
+            flex-grow: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            padding: 8px;
+            outline: none;
+        }
+
+        #send-btn {
+            background: transparent;
+            border: 1px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: var(--font-heading);
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        #send-btn:hover:not(:disabled) {
+            background: var(--accent-cyan);
+            color: var(--bg-main);
+        }
+
+        #send-btn:disabled {
+            border-color: var(--border-color);
+            color: var(--border-color);
+            cursor: not-allowed;
+        }
+
+        /* Custom Scrollbar for a sleek look */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-main);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-cyan);
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="title-block">
+            <h1>Digital Twin: Real-Time Simulation</h1>
+            <p>SINGLE AM PART FOCUS</p>
+        </div>
+        <div class="api-config">
+            <label for="api-key-input" style="font-size: 12px; color: var(--text-dim);">SYSTEM AUTH:</label>
+            <input type="password" id="api-key-input" placeholder="Enter Gemini API Key to enable AI Agent...">
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="dashboard-container">
+        
+        <!-- Left Column: 3D Viewer -->
+        <div class="viewer-section">
+            <div id="canvas-container"></div>
+            
+            <!-- Mock Floating Annotations -->
+            <div class="floating-tag tag-1">MAX STRESS: 620 MPa</div>
+            <div class="floating-tag tag-2">DIM TOLERANCE: ±0.03mm</div>
+            <div class="floating-tag tag-3">POWDER BED TEMP: 180°C</div>
+        </div>
+
+        <!-- Right Column: Metrics & Chat -->
+        <div class="sidebar">
+            
+            <!-- Dashboard Metric Panel 1 -->
+            <div class="metric-panel">
+                <h3>Part Density <span>99.8%</span></h3>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill"></div>
+                </div>
+                <div class="metric-label">
+                    <span>Target: 99.5%</span>
+                    <span style="color: var(--accent-green)">PASS</span>
+                </div>
+            </div>
+
+            <!-- Dashboard Metric Panel 2 -->
+            <div class="metric-panel">
+                <h3>Build Success Prediction</h3>
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="width: 60px; height: 60px; border-radius: 50%; border: 4px solid var(--accent-cyan); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: var(--accent-cyan);">
+                        98%
+                    </div>
+                    <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); text-align: right; line-height: 1.6;">
+                        BUILD INTEGRITY: <span style="color: var(--text-main)">OPTIMAL</span><br>
+                        RECOATER HEALTH: <span style="color: var(--text-main)">GOOD</span><br>
+                        LASER HEALTH: <span style="color: var(--accent-green)">NOMINAL</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NEW: Visualization Controls -->
+            <div class="metric-panel">
+                <h3>Visualization Controls</h3>
+                <button id="heatmap-btn" style="width: 100%; background: rgba(0, 229, 255, 0.1); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); padding: 10px; border-radius: 4px; cursor: pointer; font-family: var(--font-heading); font-weight: 600; letter-spacing: 1px; transition: all 0.3s;">
+                    RENDER FEA HEATMAP
+                </button>
+            </div>
+
+            <!-- Chat Panel -->
+            <div class="chat-panel">
+                <div class="chat-header">AI ANALYTICS AGENT</div>
+                <div id="chat-messages">
+                    <div class="message ai-message">
+                        [SYSTEM READY] Digital Twin initialized. Enter API key to query simulation data (e.g. "What is the max stress?").
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <input type="text" id="user-input" placeholder="Query simulation database..." disabled>
+                    <button id="send-btn" disabled>EXECUTE</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // ==========================================
+        // 1. THREE.JS 3D SCENE SETUP
+        // ==========================================
+        window.onload = function() {
+            const container = document.getElementById('canvas-container');
+            
+            // Scene, Camera, Renderer
+            const scene = new THREE.Scene();
+            
+            const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(0, 20, 50);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); // Alpha true for transparent background
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // Orbit Controls (allows user to rotate the model)
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 1.0;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            const pointLight1 = new THREE.PointLight(0x00e5ff, 1);
+            pointLight1.position.set(20, 20, 20);
+            scene.add(pointLight1);
+
+            const pointLight2 = new THREE.PointLight(0xff3366, 0.8);
+            pointLight2.position.set(-20, -10, -20);
+            scene.add(pointLight2);
+
+            // Create Placeholder CAD Model (A complex Torus Knot)
+            // To make it look like a simulation, we use a wireframe geometry layered over a solid one
+            const geometry = new THREE.TorusKnotGeometry(12, 3.5, 200, 32);
+            
+            // Initialize vertex colors to a base default (dark blue)
+            const count = geometry.attributes.position.count;
+            const colors = new Float32Array(count * 3);
+            for (let i = 0; i < count; i++) {
+                colors[i * 3] = 0.1;     // R
+                colors[i * 3 + 1] = 0.2; // G
+                colors[i * 3 + 2] = 0.3; // B
+            }
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            
+            // Solid dark metallic material
+            const materialSolid = new THREE.MeshPhysicalMaterial({ 
+                color: 0xffffff, // Set to white so vertex colors show properly
+                vertexColors: true, // THIS IS THE MAGIC SWITCH
+                metalness: 0.3,
+                roughness: 0.6,
+                clearcoat: 0.5,
+                clearcoatRoughness: 0.2
+            });
+            const meshSolid = new THREE.Mesh(geometry, materialSolid);
+            scene.add(meshSolid);
+
+            // Wireframe overlay to look like an FEA/CAD mesh
+            const materialWireframe = new THREE.MeshBasicMaterial({
+                color: 0x00e5ff,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.15
+            });
+            const meshWireframe = new THREE.Mesh(geometry, materialWireframe);
+            // Scale wireframe up ever so slightly to prevent z-fighting
+            meshWireframe.scale.set(1.001, 1.001, 1.001); 
+            scene.add(meshWireframe);
+
+            // Heatmap Generation Logic
+            // Converts a normalized value (0.0 to 1.0) into a Blue -> Green -> Red gradient
+            function getHeatmapColor(value) {
+                // Clamp between 0 and 1
+                value = Math.max(0, Math.min(1, value));
+                // HSL: 240 is Blue, 120 is Green, 0 is Red
+                const hue = (1.0 - value) * 240; 
+                return new THREE.Color(`hsl(${hue}, 100%, 50%)`);
+            }
+
+            // Attaches a data array to the geometry's color attribute
+            window.applyHeatmap = function(normalizedDataArray) {
+                const colorAttribute = geometry.attributes.color;
+                for(let i = 0; i < count; i++) {
+                    const val = normalizedDataArray[i % normalizedDataArray.length];
+                    const c = getHeatmapColor(val);
+                    colorAttribute.array[i * 3] = c.r;
+                    colorAttribute.array[i * 3 + 1] = c.g;
+                    colorAttribute.array[i * 3 + 2] = c.b;
+                }
+                colorAttribute.needsUpdate = true; // Tells Three.js to re-render the colors
+            };
+
+            // Button Event Listener to Simulate Data Injection
+            document.getElementById('heatmap-btn').addEventListener('click', () => {
+                const positions = geometry.attributes.position.array;
+                const fakeStressData = new Float32Array(count);
+                
+                // Generate procedural "stress" based on vertex positions
+                for(let i = 0; i < count; i++) {
+                    const x = positions[i*3];
+                    const y = positions[i*3+1];
+                    const z = positions[i*3+2];
+                    
+                    // Create hot spots where the geometry curves sharply
+                    let stress = Math.sin(x * 0.4) * Math.cos(y * 0.4) + Math.sin(z * 0.4);
+                    
+                    // Normalize to 0.0 - 1.0 range
+                    fakeStressData[i] = (stress + 2) / 4; 
+                }
+                
+                // Paint the model!
+                window.applyHeatmap(fakeStressData);
+                
+                // Update UI button state
+                const btn = document.getElementById('heatmap-btn');
+                btn.textContent = "HEATMAP ACTIVE (LIVE)";
+                btn.style.backgroundColor = "var(--accent-cyan)";
+                btn.style.color = "var(--bg-main)";
+            });
+
+            // Animation Loop
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update(); // Required if controls.enableDamping or controls.autoRotate are set
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            // Handle Window Resize
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+        };
+
+        // ==========================================
+        // 2. CHATBOT LOGIC (Connecting to Local FastAPI)
+        // ==========================================
+        const apiKeyInput = document.getElementById('api-key-input');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const chatMessages = document.getElementById('chat-messages');
+
+        // Enable inputs only when an API key is entered
+        apiKeyInput.addEventListener('input', () => {
+            const hasKey = apiKeyInput.value.trim().length > 0;
+            userInput.disabled = !hasKey;
+            sendBtn.disabled = !hasKey;
+        });
+
+        // Handle sending messages
+        async function handleSend() {
+            const query = userInput.value.trim();
+            const apiKey = apiKeyInput.value.trim();
+            if (!query || !apiKey) return;
+
+            // Append user message
+            appendMessage(`> ${query}`, 'user-message');
+            userInput.value = '';
+
+            // Append loading state
+            const loadingDiv = appendMessage('[PROCESSING...] Awaiting backend response...', 'ai-message');
+
+            try {
+                // Call local Python backend (main.py)
+                const response = await fetch(`http://127.0.0.1:8000/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: query,
+                        api_key: apiKey
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    loadingDiv.textContent = `[RESULT] ${data.response}`;
+                } else {
+                    loadingDiv.className = 'message ai-message error-message';
+                    loadingDiv.textContent = `[ERROR] Backend Error: ${data.detail || "Check Python console"}`;
+                    console.error("Backend Error:", data);
+                }
+
+            } catch (error) {
+                console.error("Fetch error:", error);
+                loadingDiv.className = 'message ai-message error-message';
+                loadingDiv.textContent = "[CONNECTION FAILED] Ensure local Python server (uvicorn) is running at http://127.0.0.1:8000.";
+            }
+        }
+
+        function appendMessage(text, className) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${className}`;
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight; // Auto-scroll to bottom
+            return messageDiv;
+        }
+
+        sendBtn.addEventListener('click', handleSend);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleSend();
+        });
+    </script>
+</body>
+</html>

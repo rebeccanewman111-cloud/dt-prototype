@@ -1,0 +1,15 @@
+{
+    "digital_twin": "demo_structure_01",
+    "components": {
+        "primary_beam": {
+            "type": "structural_member",
+            "material": "steel",
+            "data_path": "/simulations/load_case_A/primary_beam/stress"
+        },
+        "connection_plate": {
+            "type": "joint",
+            "material": "aluminum",
+            "data_path": "/simulations/load_case_A/connection_plate/temperature"
+        }
+    }
+}
